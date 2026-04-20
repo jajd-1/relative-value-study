@@ -5,8 +5,11 @@ import statsmodels.api as sm
 import data
 
 
-def estimate_hedge_ratio(prices: pd.DataFrame) -> tuple[float,float]:
+def estimate_hedge_ratio(prices: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timestamp) -> tuple[float,float]:
     """Regress y (first column) on x (second column) with intercept and return the regression coefficients"""
+    mask = (prices.index >= start_date) & (prices.index <= end_date)
+    prices = prices.loc[mask]
+
     y = prices.iloc[:, 0]
     x = prices.iloc[:, 1]
 
@@ -19,88 +22,116 @@ def estimate_hedge_ratio(prices: pd.DataFrame) -> tuple[float,float]:
     return alpha, beta
 
 
-def construct_spread(prices: pd.DataFrame, alpha: float, beta: float) -> float:
-    """With alpha and beta equal to the regression coefficients, we return the OLS residual (aka spread)"""
+def construct_spread(prices: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timestamp, formation_window: int) -> tuple[pd.Series, pd.Series]:
+    """For each year between first_year and last_year, we return the OLS residual (aka spread) with alpha and beta equal to the regression coefficients found from the previous formation_window years"""
+    spread = pd.Series(np.nan, index = prices.index)
+    betas = pd.Series(np.nan, index = prices.index)
     y = prices.iloc[:, 0]
     x = prices.iloc[:, 1]
-    
-    spread = y - alpha  - beta*x
-    spread.name = 'spread'
 
-    return spread 
+    for day in prices.loc[start_date:end_date].index:
+        alpha, beta = estimate_hedge_ratio(prices, day - pd.DateOffset(years = formation_window), day - pd.DateOffset(days = 1))
+        mask = (prices.index == day)
+        spread.loc[mask] = y.loc[mask] - alpha - beta * x.loc[mask]
+        betas.loc[mask] = beta 
+
+    return spread, betas 
 
 
-def compute_zscore(spread: float, window: int) -> tuple[float, float, float]:
+def compute_zscore(spread: float, zscore_window: int) -> tuple[pd.Series, pd.Series, pd.Series]:
     """Computes the z-score of the spread on day T using the rolling mean and rolling standard deviation from the previous window number of days"""
-    rolling_mean = spread.rolling(window).mean()
-    rolling_std = spread.rolling(window).std()
+    
+    rolling_mean = spread.rolling(zscore_window).mean().shift(1)
+    rolling_std = spread.rolling(zscore_window).std().shift(1)
 
     zscore = (spread - rolling_mean) / rolling_std 
-    zscore.name = 'zscore'
 
     return rolling_mean, rolling_std, zscore 
 
 
-def generate_positions(zscore: float, entry_threshold: float, exit_threshold: float) -> pd.Series:
+def generate_positions(zscore: pd.Series, start_date: pd.Timestamp, entry_threshold: float, exit_threshold: float) -> tuple[pd.Series, pd.Series]:
     """
-    Position convention: +1 = long spread, -1 = short spread, 0 = flat
+    Holding position convention: +1 = holding long spread, -1 = holding short spread, 0 = flat
 
-    Rules:  if flat and zscore < -entry_threshold: enter long spread
-            if flat and zscore >  entry_threshold: enter short spread
-            if long spread and zscore > -exit_threshold: exit
-            if short spread and zscore < exit_threshold: exit
+    Rules:  if flat and zscore < -entry_threshold on day t: make trade on day t and enter long spread (reflected in holding position from day t+1)
+            if flat and zscore >  entry_threshold on day t: make trade on day t and enter short spread (reflected in holding position from day t+1)
+            if long spread and zscore > -exit_threshold on day t: make trade on day t and exit long spread (reflected in holding position from day t+1)
+            if short spread and zscore < exit_threshold on day t: make trade on day t and exit short spread (reflected in holding position from day t+1)
     """
-    position = pd.Series(index = zscore.index, dtype = float)
-    current_position = 0 
 
-    for t in range(len(zscore)):    #we will later shift positions by one day, i.e. close price on day t determines what we do on day t+1
-        z = zscore.iloc[t]
+    holding_position = pd.Series(0, index = zscore.index, dtype = int)
+    trade_made = pd.Series(0, index = zscore.index, dtype = int)
+    current_holding_position = 0
 
-        if pd.isna(z):
-            position.iloc[t] = 0 
-            continue 
+    mask = (zscore.index >= start_date)
 
-        if current_position == 0:
-            if z < -entry_threshold:
-                current_position = 1    
-            elif z > entry_threshold:
-                current_position = -1   
-        
-        elif current_position == 1:
-            if z > -exit_threshold:
-                current_position = 0    #should also consider case z > entry_threshold, in which case current position should change to -1?
-        
-        elif current_position == -1:
-            if z < exit_threshold:
-                current_position = 0    #similar comment to above 
-        
-        position.iloc[t] = current_position 
+    for t in range(len(zscore)):    
+        if mask[t]:
+            z = zscore.iloc[t]
 
-    position.name = 'position'
+            if current_holding_position == 0:
+                if z < -entry_threshold:
+                    trade_made.iloc[t] = 1 
+                    if t != len(zscore) - 1:
+                        holding_position.iloc[t+1] = 1
+                    current_holding_position = 1    
+                elif z > entry_threshold:
+                    trade_made.iloc[t] = 1
+                    if t != len(zscore) - 1:
+                        holding_position.iloc[t+1] = -1
+                    current_holding_position = -1   
+            
+            elif current_holding_position == 1:
+                if z > -exit_threshold:
+                    if z > entry_threshold:
+                        trade_made.iloc[t] = 2
+                        if t != len(zscore) - 1:
+                            holding_position.iloc[t+1] = -1
+                        current_holding_position = -1
+                    else:
+                        trade_made.iloc[t] = 1
+                        current_holding_position = 0    
+                elif t != len(zscore) - 1:
+                    holding_position.iloc[t+1] = 1
+            
+            elif current_holding_position == -1:
+                if z < exit_threshold:
+                    if z < -entry_threshold:
+                        trade_made.iloc[t] = 2
+                        if t != len(zscore) - 1:
+                            holding_position.iloc[t+1] = 1
+                        current_holding_position = 1
+                    else:
+                        trade_made.iloc[t] = 1
+                        current_holding_position = 0   
+                elif t != len(zscore) - 1:
+                    holding_position.iloc[t+1] = -1 
+         
+    return trade_made, holding_position.fillna(0.0)        
 
-    return position 
-
-def build_signal_dataframe(prices: pd.DataFrame, window: int, entry_threshold: float , exit_threshold: float) -> tuple[pd.DataFrame, float, float, float]:
+def build_signal_dataframe(prices: pd.DataFrame, trading_start: pd.Timestamp, trading_end: pd.Timestamp, formation_window: int, 
+                           zscore_window: int, entry_threshold: float , exit_threshold: float) -> tuple[pd.DataFrame, pd.Series]:
     """Combine the above into one dataframe"""
-    alpha, beta = estimate_hedge_ratio(prices)
-    spread = construct_spread(prices, alpha, beta)
-    spread_mean, spread_std, zscore = compute_zscore(spread, window = window) 
-    position = generate_positions(zscore, entry_threshold = entry_threshold, exit_threshold = exit_threshold) 
+    spread, betas = construct_spread(prices, trading_start - pd.DateOffset(days = zscore_window), trading_end, formation_window)
+    spread_mean, spread_std, zscore = compute_zscore(spread, zscore_window) 
+    trade_made, holding_position = generate_positions(zscore, trading_start, entry_threshold, exit_threshold) 
 
     signal_df = prices.copy()
     signal_df['spread'] = spread
     signal_df['spread_mean'] = spread_mean
     signal_df['spread_std'] = spread_std
     signal_df['zscore'] = zscore
-    signal_df['position'] = position
+    signal_df['betas'] = betas
+    signal_df['holding_position'] = holding_position
+    signal_df['trade_made'] = trade_made 
 
-    return signal_df, spread, alpha, beta
+    return signal_df, spread
 
 
 # ---------------- Visual inspection ------------------
 
 
-def plot_spread(signal_df: pd.DataFrame):
+def plot_spread(signal_df: pd.DataFrame) -> None:
     signal_df['spread'].plot(figsize = (12,5))
     plt.title(f'Spread after regressing {signal_df.columns[0]} on {signal_df.columns[1]}')
     plt.xlabel('Date')
@@ -109,7 +140,7 @@ def plot_spread(signal_df: pd.DataFrame):
     plt.tight_layout()
     plt.show()
 
-def plot_zscore(signal_df: pd.DataFrame, entry_threshold: float, exit_threshold: float):
+def plot_zscore(signal_df: pd.DataFrame, entry_threshold: float, exit_threshold: float) -> None:
     signal_df['zscore'].plot(figsize = (12,5), label = 'z-score')
     plt.axhline(entry_threshold, linestyle = '--', color = 'red', label = 'Entry thresholds')
     plt.axhline(-entry_threshold, linestyle = '--', color = 'red')
@@ -123,15 +154,15 @@ def plot_zscore(signal_df: pd.DataFrame, entry_threshold: float, exit_threshold:
     plt.legend(loc = 'best')
     plt.show()
 
-def plot_position(signal_df: pd.DataFrame):
-    signal_df['position'].plot(figsize=(12, 3))
-    plt.title(f'Trading position for {signal_df.columns[0]}/{signal_df.columns[1]} spread')
+def plot_position(signal_df: pd.DataFrame) -> None:
+    signal_df['holding_position'].plot(figsize=(12, 3))
+    plt.title(f'Holding position for {signal_df.columns[0]}/{signal_df.columns[1]} spread')
     plt.xlabel('Date')
     plt.ylabel('Position')
     plt.tight_layout()
     plt.show()
 
-def run_plots2(df: pd.DataFrame, entry_threshold: float, exit_threshold: float):
+def run_plots2(df: pd.DataFrame, entry_threshold: float, exit_threshold: float) -> None:
     plot_spread(df)
     plot_zscore(df, entry_threshold, exit_threshold)
     plot_position(df)

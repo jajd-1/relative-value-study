@@ -1,5 +1,7 @@
 # Pairs trading
 
+DOESN'T REFLECT UPDATED CODE YET!
+
 We build a cointegration-based pairs trading research pipeline. 
 
 

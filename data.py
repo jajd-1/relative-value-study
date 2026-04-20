@@ -6,7 +6,7 @@ from itertools import combinations
 from statsmodels.tsa.stattools import coint 
 
 
-def load_prices(tickers: list[str], start_date: str, end_date: str) -> pd.DataFrame:  #date should be of the form 'yyyy-mm-dd'
+def load_prices(tickers: list[str], start_date: pd.Timestamp, end_date: pd.Timestamp) -> pd.DataFrame:  # can also enter date as string of the form 'yyyy-mm-dd'
     """Load adjusted prices from yfinance"""
     data = yf.download(tickers, start = start_date , end = end_date, auto_adjust = False, progress = False) 
 
@@ -36,7 +36,7 @@ def test_coint(series1: pd.Series, series2: pd.Series) -> float:
     return pvalue 
 
 
-def find_coint_pairs(tickers: list[str], start_date: str, end_date: str, pvalue_threshold: float) -> tuple[pd.DataFrame, pd.DataFrame, list[list]]:
+def find_coint_pairs(tickers: list[str], start_date: pd.Timestamp, end_date: pd.Timestamp, pvalue_threshold: float) -> tuple[pd.DataFrame, pd.DataFrame, list[list]]:
     """Tests all pairs for cointegration and returns 3 things: a dataframe consisting of p-values for all pairs, a dataframe consisting of p-values below the threshold, and
      a list of pairs for which the corresponding p-value is below the threshold."""
     results = []
@@ -69,17 +69,17 @@ def find_coint_pairs(tickers: list[str], start_date: str, end_date: str, pvalue_
 
 # --------------- Visual inspection ----------------
 
-def plot_raw_prices(prices: pd.DataFrame):
+def plot_raw_prices(prices: pd.DataFrame) -> None:
     fig, ax = plt.subplots(figsize = (12, 6))
     prices.plot(ax = ax)
     plt.title('Adjusted Close Prices')
     plt.xlabel('Date')
     plt.ylabel('Price')
     plt.legend(loc = 'best')
-    plt.tight_layout
+    plt.tight_layout()
 
 
-def plot_normalised_prices(prices: pd.DataFrame):
+def plot_normalised_prices(prices: pd.DataFrame) -> None:
     normalised = prices/prices.iloc[0]
     fig, ax = plt.subplots(figsize = (12,6))
     normalised.plot(ax = ax)
@@ -90,7 +90,7 @@ def plot_normalised_prices(prices: pd.DataFrame):
     plt.tight_layout()
     
 
-def plot_normalised_price_ratios(prices: pd.DataFrame):
+def plot_normalised_price_ratios(prices: pd.DataFrame) -> None:
     normalised = prices/prices.iloc[0]
     ratio = normalised.iloc[:, 0]/normalised.iloc[:, 1]
     fig, ax = plt.subplots(figsize = (12, 6))
@@ -102,7 +102,7 @@ def plot_normalised_price_ratios(prices: pd.DataFrame):
     plt.tight_layout()
     
 
-def plot_normalised_price_scatter(prices: pd.DataFrame):
+def plot_normalised_price_scatter(prices: pd.DataFrame) -> None:
     normalised = prices/prices.iloc[0]
     plt.figure(figsize = (6,6))
     plt.scatter(normalised.iloc[:, 0], normalised.iloc[:, 1], alpha = 0.5, marker = '.')
@@ -112,7 +112,7 @@ def plot_normalised_price_scatter(prices: pd.DataFrame):
     plt.tight_layout()
 
 
-def run_plots1(pairs: list[list[str]], start_date: str, end_date: str):
+def run_plots1(pairs: list[list[str]], start_date: pd.Timestamp, end_date: pd.Timestamp) -> None:
     for pair in pairs: 
         prices = load_prices(pair, start_date, end_date)
         plot_normalised_prices(prices)
