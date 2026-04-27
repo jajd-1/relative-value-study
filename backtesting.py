@@ -29,7 +29,7 @@ def backtest_pair(signal_df: pd.DataFrame, cost_bps: float) -> pd.DataFrame:
     cost_rate = cost_bps / 10000.0
     entry_exit_cost = trade_made * cost_rate                    #computes transaction cost on returns if a position has been entered or exited
     beta_turnover = abs(signal_beta - held_beta) * x / gross_exposure_per_unit
-    rebalancing_cost = continuing_position.astype(float) * cost_rate * beta_turnover
+    rebalancing_cost = (continuing_position.astype(float) * cost_rate * beta_turnover).fillna(0.0)
     total_cost = entry_exit_cost + rebalancing_cost
 
     net_return = gross_return - total_cost                          #net return equals gross return except on days after a position has been entered or exited, where transaction costs are taken on
@@ -66,6 +66,8 @@ def plot_cumulative_return(backtest_df: pd.DataFrame) -> None:
     plt.xlabel('Date')
     plt.ylabel('Portfolio Value')
     plt.tight_layout()
+    filename = f'{backtest_df.columns[0]}{backtest_df.columns[1]}netreturn.png'
+    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
     plt.show()
 
 
@@ -75,6 +77,8 @@ def plot_drawdown(backtest_df: pd.DataFrame) -> None:
     plt.xlabel('Date')
     plt.ylabel('Drawdown')
     plt.tight_layout()
+    filename = f'{backtest_df.columns[0]}{backtest_df.columns[1]}drawdown.png'
+    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
     plt.show()
 
 

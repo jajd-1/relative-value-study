@@ -32,8 +32,11 @@ def generate_pairs(tickers: list[str]) -> list[list[str]]:
 
 def test_coint(series1: pd.Series, series2: pd.Series) -> float:
     """Uses the Engle-Granger method to test for cointegration between series1 and series2, with a low p-value suggesting cointegration"""
-    score, pvalue, _ = coint(series1, series2)
+    _, pvalue, _ = coint(series1, series2, trend = 'c')     #change trend to 'ct' to allow constant + linear trend 
     return pvalue 
+
+
+
 
 
 def find_coint_pairs(tickers: list[str], start_date: pd.Timestamp, end_date: pd.Timestamp, pvalue_threshold: float) -> tuple[pd.DataFrame, pd.DataFrame, list[list]]:
@@ -50,19 +53,19 @@ def find_coint_pairs(tickers: list[str], start_date: pd.Timestamp, end_date: pd.
         try:
             pvalue = test_coint(series1, series2)
             results.append({
-                'ticker1': ticker1,
-                'ticker2': ticker2,
-                'pvalue': pvalue 
+                'Ticker 1': ticker1,
+                'Ticker 2': ticker2,
+                'p-value': pvalue 
             })
         
         except Exception as e:
             print(f'Error testing {ticker1}-{ticker2}: {e}')
 
     results_df = pd.DataFrame(results)
-    results_df = results_df.sort_values('pvalue')
+    results_df = results_df.sort_values('p-value')
 
-    best = results_df[(0 < results_df['pvalue']) & (results_df['pvalue'] < pvalue_threshold)].reset_index(drop = True)
-    best_pairs = best[['ticker1', 'ticker2']].values.tolist()
+    best = results_df[(0 < results_df['p-value']) & (results_df['p-value'] < pvalue_threshold)].reset_index(drop = True)
+    best_pairs = best[['Ticker 1', 'Ticker 2']].values.tolist()
 
     return results_df, best, best_pairs
 
@@ -72,11 +75,13 @@ def find_coint_pairs(tickers: list[str], start_date: pd.Timestamp, end_date: pd.
 def plot_raw_prices(prices: pd.DataFrame) -> None:
     fig, ax = plt.subplots(figsize = (12, 6))
     prices.plot(ax = ax)
-    plt.title('Adjusted Close Prices')
+    plt.title(f'Adjusted Close Prices for {prices.columns[0]} and {prices.columns[1]}')
     plt.xlabel('Date')
     plt.ylabel('Price')
     plt.legend(loc = 'best')
     plt.tight_layout()
+    filename = f'{prices.columns[0]}{prices.columns[1]}1.png'
+    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
 
 
 def plot_normalised_prices(prices: pd.DataFrame) -> None:
@@ -88,6 +93,8 @@ def plot_normalised_prices(prices: pd.DataFrame) -> None:
     plt.ylabel('Normalised Price')
     plt.legend(loc = 'best')
     plt.tight_layout()
+    filename = f'{prices.columns[0]}{prices.columns[1]}2.png'
+    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
     
 
 def plot_normalised_price_ratios(prices: pd.DataFrame) -> None:
@@ -100,6 +107,8 @@ def plot_normalised_price_ratios(prices: pd.DataFrame) -> None:
     plt.ylabel('Ratio')
     plt.legend(loc = 'best')
     plt.tight_layout()
+    filename = f'{prices.columns[0]}{prices.columns[1]}3.png'
+    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
     
 
 def plot_normalised_price_scatter(prices: pd.DataFrame) -> None:
@@ -110,12 +119,14 @@ def plot_normalised_price_scatter(prices: pd.DataFrame) -> None:
     plt.ylabel(prices.columns[1])
     plt.title(f'{prices.columns[1]} vs {prices.columns[0]} Normalised Price Scatter')
     plt.tight_layout()
+    filename = f'{prices.columns[0]}{prices.columns[1]}4.png'
+    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
 
 
 def run_plots1(pairs: list[list[str]], start_date: pd.Timestamp, end_date: pd.Timestamp) -> None:
     for pair in pairs: 
         prices = load_prices(pair, start_date, end_date)
+        plot_raw_prices(prices)
         plot_normalised_prices(prices)
-        plot_normalised_price_ratios(prices)
         plot_normalised_price_scatter(prices)
         plt.show()

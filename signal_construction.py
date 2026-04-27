@@ -13,6 +13,9 @@ def estimate_hedge_ratio(prices: pd.DataFrame, start_date: pd.Timestamp, end_dat
     y = prices.iloc[:, 0]
     x = prices.iloc[:, 1]
 
+    if x.nunique() < 2:
+        raise ValueError(f"Cannot estimate hedge ratio: not enough dates or x series is constant between {start_date.date()} and {end_date.date()}.")
+
     X = sm.add_constant(x)      #add column of 1s to x to include intercept in OLS
     model = sm.OLS(y,X).fit()
 
@@ -109,10 +112,10 @@ def generate_positions(zscore: pd.Series, start_date: pd.Timestamp, entry_thresh
          
     return trade_made, holding_position.fillna(0.0)        
 
-def build_signal_dataframe(prices: pd.DataFrame, trading_start: pd.Timestamp, trading_end: pd.Timestamp, formation_window: int, 
+def build_signal_dataframe(prices: pd.DataFrame, spread_start: pd.Timestamp, trading_start: pd.Timestamp, trading_end: pd.Timestamp, formation_window: int, 
                            zscore_window: int, entry_threshold: float , exit_threshold: float) -> tuple[pd.DataFrame, pd.Series]:
     """Combine the above into one dataframe"""
-    spread, betas = construct_spread(prices, trading_start - pd.DateOffset(days = zscore_window), trading_end, formation_window)
+    spread, betas = construct_spread(prices, spread_start, trading_end, formation_window)
     spread_mean, spread_std, zscore = compute_zscore(spread, zscore_window) 
     trade_made, holding_position = generate_positions(zscore, trading_start, entry_threshold, exit_threshold) 
 
@@ -138,7 +141,10 @@ def plot_spread(signal_df: pd.DataFrame) -> None:
     plt.ylabel('Spread')
     plt.legend(loc = 'best')
     plt.tight_layout()
+    filename = f'{signal_df.columns[0]}{signal_df.columns[1]}spread.png'
+    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
     plt.show()
+
 
 def plot_zscore(signal_df: pd.DataFrame, entry_threshold: float, exit_threshold: float) -> None:
     signal_df['zscore'].plot(figsize = (12,5), label = 'z-score')
@@ -152,7 +158,10 @@ def plot_zscore(signal_df: pd.DataFrame, entry_threshold: float, exit_threshold:
     plt.ylabel('Z-score')
     plt.tight_layout()
     plt.legend(loc = 'best')
+    filename = f'{signal_df.columns[0]}{signal_df.columns[1]}zscore.png'
+    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
     plt.show()
+
 
 def plot_position(signal_df: pd.DataFrame) -> None:
     signal_df['holding_position'].plot(figsize=(12, 3))
@@ -160,7 +169,10 @@ def plot_position(signal_df: pd.DataFrame) -> None:
     plt.xlabel('Date')
     plt.ylabel('Position')
     plt.tight_layout()
+    filename = f'{signal_df.columns[0]}{signal_df.columns[1]}position.png'
+    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
     plt.show()
+
 
 def run_plots2(df: pd.DataFrame, entry_threshold: float, exit_threshold: float) -> None:
     plot_spread(df)

@@ -27,12 +27,14 @@ def return_stats(returns: pd.Series, trading_days: int, risk_free_rate: float, t
         annualised_sharpe =  trading_days * (returns.mean() - ((1 + risk_free_rate)**(1/trading_days) - 1)) / annualised_vol
 
     return pd.Series({
-        "total_return": total_return,
-        "annualised_return": annualised_return,
-        "annualised_vol": annualised_vol,
-        "annualised_sharpe": annualised_sharpe,
-        "max_drawdown": max_drawdown,
+        "Total return": total_return,
+        "Annualised return": annualised_return,
+        "Annualised volatility": annualised_vol,
+        "Annualised Sharpe ratio": annualised_sharpe,
+        "Maximum drawdown": max_drawdown,
     })
+
+
 
 
 def extract_trades(backtest_df: pd.DataFrame, cost_bps: float) -> pd.DataFrame:
@@ -79,6 +81,7 @@ def extract_trades(backtest_df: pd.DataFrame, cost_bps: float) -> pd.DataFrame:
                 'entry_date': backtest_df.index[entry_date],
                 'exit_date': backtest_df.index[exit_date],
                 'direction': direction,
+                'is_open': False,
                 'duration_days': exit_date - entry_date, 
                 'cumulative_gross_trade_return': cumulative_gross_trade_return,
                 'cumulative_net_trade_return': cumulative_net_trade_return
@@ -90,10 +93,8 @@ def extract_trades(backtest_df: pd.DataFrame, cost_bps: float) -> pd.DataFrame:
             
 
     if entry_date is not None:
-        exit_date = len(holding_position) - 1
-
-        gross_trade_return = gross_return.iloc[entry_date : exit_date + 1].copy()
-        net_trade_return = net_return.iloc[entry_date : exit_date + 1].copy()
+        gross_trade_return = gross_return.iloc[entry_date : len(holding_position)].copy()
+        net_trade_return = net_return.iloc[entry_date : len(holding_position)].copy()
 
         if position_reversal == True: 
             gross_trade_return.iloc[0] = 0.0
@@ -104,16 +105,17 @@ def extract_trades(backtest_df: pd.DataFrame, cost_bps: float) -> pd.DataFrame:
 
         trades.append({
             'entry_date': backtest_df.index[entry_date],
-            'exit_date': backtest_df.index[exit_date],
+            'exit_date': pd.NaT,
             'direction': direction,
-            'duration_days': exit_date - entry_date, 
+            'is_open': True,
+            'duration_days': len(holding_position) - 1 - entry_date, 
             'cumulative_gross_trade_return': cumulative_gross_trade_return,
             'cumulative_net_trade_return': cumulative_net_trade_return
         })
 
     return pd.DataFrame(trades)
 
-def trade_stats(trades_df: pd.Series) -> None:
+def closed_trade_stats(trades_df: pd.Series) -> None:
     if trades_df.empty: 
         return pd.Series({
             "trade_count": 0,
@@ -123,7 +125,8 @@ def trade_stats(trades_df: pd.Series) -> None:
             "avg_loss": np.nan
         })
     
-    trade_return = trades_df['cumulative_net_trade_return']
+    closed_trades = trades_df[~trades_df['is_open']]
+    trade_return = closed_trades['cumulative_net_trade_return']
 
     wins = trade_return[trade_return > 0]
     losses = trade_return[trade_return < 0]
@@ -131,7 +134,7 @@ def trade_stats(trades_df: pd.Series) -> None:
     avg_loss = losses.mean() if len(losses)>0 else np.nan
 
     stats = pd.Series({
-        'trade_count': len(trades_df),
+        'trade_count': len(closed_trades),
         'hit_rate': (trade_return > 0).mean(),
         'avg_trade_return': trade_return.mean(),
         'median_trade_return': trade_return.median(),
@@ -140,14 +143,8 @@ def trade_stats(trades_df: pd.Series) -> None:
         'avg_win': avg_win,
         'avg_loss': avg_loss, 
         'payoff_ratio': avg_win / abs(avg_loss) if pd.notna(avg_win) and pd.notna(avg_loss) and avg_loss != 0 else np.nan,
-        'avg_holding_period_days': trades_df['duration_days'].mean(),
-        'median_holding_period_days': trades_df['duration_days'].median(),
+        'avg_holding_period_days': closed_trades['duration_days'].mean(),
+        'median_holding_period_days': closed_trades['duration_days'].median(),
     })
 
     return stats 
-
-
-
-
-
-

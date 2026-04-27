@@ -80,4 +80,116 @@ Finally we evaluate the performance of the strategy. (Already in code, to be add
 
 ## An example 
 
+We run through the pipeline with the following parameters (note that we set the p-value threshold equal to 1 for illustration purposes, as we'd also like to see the plots of pairs that aren't cointegrated):
+
+<pre>
+tickers = ["QQQ", "XLK", "GLD"]                  #tickers of assets under consideration; all possible pairs will be assessed for cointegration in data.py if find_pairs = True
+ 
+start_date = pd.Timestamp('2010-01-01')                                        #starting date for price data (also taken to be the start of the formation period)
+end_date = pd.Timestamp('2026-04-16')                                          #ending date for price data 
+formation_window = 6                                                           #number of previous years used to compute OLS coefficients
+zscore_window = 50                                                             #rolling window in trading days for computing the z-score of the spread
+formation_end = start_date + pd.DateOffset(years = formation_window)           #end of initial formation period, i.e. first date we compute the spread using formation_window years of previous price data    
+
+
+pvalue_threshold = 1.0                            #p-value for Engle-Granger test
+pair = ['QQQ', 'XLK']                             #choose a single pair for signal construction and backtesting
+benchmark = ['SPY']                               #choose a single benchmark asset to compare our strategy against
+entry_threshold = 1.5                             #value of z-score above/below zero to trigger entering a short/long position on the spread
+exit_threshold = 0.25                             #value of z-score above/below zero to trigger exiting a short/long position on the spread
+cost_bps = 1.0                                    #transaction cost in basis points
+trading_days = 252                                #trading days in a year
+risk_free_rate = 0.01                             #risk-free interest rate used in computing Sharpe ratio
+</pre>
+
+We also run all parts of the program, again for illustration purposes:
+
+<pre>
+find_pairs = True                  #set to false if you already know the pair you want to look at (i.e. you don't need to search for pairs in data.py)
+build_strat = True                 #set to false if you only want to search for pairs using data.py
+plots1 = True                      #set to false if you don't want to see plots of the proposed cointegrated pairs from data.py
+plots2 = True                      #set to false if you don't want to see plots of the spread, z-score and positions from signal_construction.py
+plots3 = True                      #set to false if you don't want to see plots of returns and drawdowns from backtesting.py
+show_individual_trades = True      #set to false if you don't want to see the list of individual trades
+</pre>
+
+When `main.py` is run, it will first call upon `data.py` to run the Engle-Granger cointegration test on all possible pairs from the list `tickers`, output a list of the pairs for which the resulting p-value is less than `pvalue_threshold` and produce some relevant plots. Since we have set the p-value threshold equal to 1.0 for illustration purposes, all pairs and their corresponding plots will be produced. Let us first look at the table: 
+
+| Ticker 1 | Ticker 2 | p-value |
+|--------|--------|--------:|
+| QQQ | XLK | 0.078678 |
+| QQQ | GLD | 0.584890 |
+| XLK | GLD | 0.621507 |
+
+There are no surprises here: QQQ and XLK are highly overlapping large-cap U.S. technology/growth ETFs (more precisely, QQQ tracks the Nasdaq-100 index and has heavy tech exposure, and XLK tracks the S&P500 technology sector) and are therefore natural candidates for a cointegration-based pair trading strategy, whereas GLD is a Gold ETF designed to track the price of Gold bullion, which we'd expect to bear little relation to QQQ or XLK. This intuition is reflected in the p-values for cointegration appearing in the table above. 
+
+Further evidence for cointegration between QQQ and XLK can be seen from the plot of their normalised prices:
+
+<p align="center">
+  <img src="images/QQQXLK2.png" width="800" alt="QQQ XLK normalised prices screenshot">
+</p>
+
+This can be contrasted with e.g. the plot of normalised prices for QQQ and GLD:
+
+<p align="center">
+  <img src="images/GLDQQQ2.png" width="800" alt="GLD QQQ normalised prices screenshot">
+</p>
+
+The rest of the pipeline considers one fixed pair, which has been specified above as `pair = ['QQQ', 'XLK']`. Within `signal_construction.py`, the hedge ratio and resulting spread are computed and plotted; as hoped for our proposed strategy, some mean-reversion is evident: 
+
+<p align="center">
+  <img src="images/QQQXLKspread.png" width="800" alt="QQQ XLK spread">
+</p>
+
+We then compute and plot the z-score of the spread, marking both the entry and exit thresholds which dictate when we enter or exit a position: 
+
+<p align="center">
+  <img src="images/QQQXLKzscore.png" width="800" alt="QQQ XLK spread">
+</p>
+
+Finally, trading positions are generated according to the strategy described above: 
+
+<p align="center">
+  <img src="images/QQQXLKposition.png" width="800" alt="QQQ XLK spread">
+</p>
+
+In backtesting the strategy, we produce plots of cumulative net returns and drawdowns; note that the flat parts in the following plots correspond to the formation periods where no trading takes place: 
+
+<p align="center">
+  <img src="images/QQQXLKnetreturn.png" width="800" alt="QQQ XLK spread">
+</p>
+
+<p align="center">
+  <img src="images/QQQXLKdrawdown.png" width="800" alt="QQQ XLK spread">
+</p>
+
+Finally, we evaluate the performance of our strategy and compare it against the specified benchmark, in our case chosen to be `benchmark = ['SPY']` (an ETF designed to track the S&P500). 
+
+|              | Strategy | Benchmark |
+|--------------------|---------:|----------:|
+| Total return       | 0.1913   | 3.0406    |
+| Annualised return  | 0.0176   | 0.1489    |
+| Annualised volatility     | 0.0210   | 0.1788    |
+| Annualised Sharpe ratio  | 0.3652   | 0.8106    |
+| Maximum drawdown       | 0.0312   | 0.3372    |
+
+We also compute the beta of our strategy relative to the benchmark and correlation of returns between our strategy and benchmark: 
+
+<pre>
+Beta relative to the benchmark: 0.0087
+Correlation with the benchmark: 0.074
+</pre>
+
+We see that the QQQ/XLK spread produced modest positive out-of-sample returns with low volatility, low drawdown, and very low market beta and correlation, making it a useful case study for a market-neutral relative-value backtest. However, it did not match the absolute or risk-adjusted performance of long-only equity exposure over the same period. As a sensitivity check, we can remove transaction costs and set the risk-free rate to zero, two simplifying assumptions often made in more naive backtests. Under these assumptions, the strategy’s Sharpe ratio exceeds that of the benchmark, illustrating how realistic frictions and financing assumptions can materially reduce the apparent attractiveness of a trading strategy: 
+
+|              | Strategy | Benchmark |
+|--------------------|---------:|----------:|
+| Total return       | 0.2133   | 3.0406    |
+| Annualised return  | 0.0194   | 0.1489    |
+| Annualised volatility     | 0.0210   | 0.1788    |
+| Annualised Sharpe ratio  | 0.9217   | 0.8663    |
+| Maximum drawdown       | 0.0312   | 0.3372    |
+
+
+
 ## To do
