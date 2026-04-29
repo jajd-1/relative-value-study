@@ -72,11 +72,11 @@ $$c = \frac{C_{bp}}{10,000}$$
 
 per unit currency traded. A reasonable assumption is $1 \leq C_{bp} \leq 5$. If we enter a position at close on day t, our cost for one spread unit is therefore $c(|y_t| + |\beta_t x_t|)$, and hence we should subtract the following quantity from gross returns for that day:
 
-$$ \tag{1} {c\frac{(|y_t| + |\beta_t x_t|)}{|y_{t-1}| + |\beta_{t-1} x_{t-1}|}.} $$
+$$ \tag{1} {c \cdot \frac{|y_t| + |\beta_t x_t|}{|y_{t-1}| + |\beta_{t-1} x_{t-1}|}.} $$
 
 Similarly, if we exit a position at close on day $t$, our cost for one spread unit is $c(|y_t| + |\beta_{t-1} x_t|)$, and hence we should subtract the following quantity from gross returns for that day:
 
-$$ \tag{2} {c\frac{(|y_t| + |\beta_t x_t|)}{|y_{t-1}| + |\beta_{t-1} x_{t-1}|}.} $$
+$$ \tag{2} {c \cdot \frac{|y_t| + |\beta_t x_t|}{|y_{t-1}| + |\beta_{t-1} x_{t-1}|}.} $$
 
 Typically, the ratios in equations (1) and (2) are close to one, and the current version of our code uses this approximation. The rebalancing costs, which are typically incurred every day a position is held (with the exception of the day the position is exited) are also subtracted from gross returns and are given by 
 
@@ -84,9 +84,25 @@ Typically, the ratios in equations (1) and (2) are close to one, and the current
 
 where $\Delta \beta_t = \beta_t - \beta_{t-1}$. After subtracting these transaction costs we arrive at the net return $r_t$ for day $t$, and the net return for a given period is then 
 
-$$ \prod_t (1+r_t) - 1.$$
+$$ R = \prod_t (1+r_t) - 1.$$
 
-Finally we evaluate the performance of the strategy. (Already in code, to be added here later)
+Finally we evaluate the performance of the strategy. We first compute the maximum drawdown, which is the largest peak-to-trough percentage decline in cumulative net returns over the trading period. A low maximum drawdown is good for many reasons. For example, if the strategy is being leveraged, then large drawdowns may force deleveraging or liquidiation before a recovery can happen. More generally, a risk-averse investor may also impose (or be subject to) strict maximum drawdown limits, again leading to liquidation before any recovery. 
+
+Beyond computing cumulative net return $R$ for the whole trading period consisting of $d$ days, we also provide annualised metrics which make for easier comparisons with other strategies over different periods. Assuming the number of trading days in a year is 252, the annualised return is
+
+$$ R_{\text{annual}} = (1+R)^{\frac{252}{d}} - 1 $$
+
+and the annualised volatility is 
+
+$$ \sigma_{\text{annual}} = \sqrt{252}\sigma_{\text{daily}}, $$
+
+where $\sigma_{\text{daily}}$ is the daily volatility given by the standard deviation of daily returns over the trading period. We also compute the annualised Sharpe ratio, a risk-adjusted measure of the performance of the strategy relative to a risk-free investment. If $\overline{r}$ denotes the daily mean return over our trading period, $r_f^{\text{annual}}$ is the annual risk-free rate (which we assume for simplicity to be constant over the trading period) and $r_f^{\text{daily}} = (1+r_f^{\text{annual}})^{\frac{1}{252}} - 1$ is the daily risk-free rate, then the annualised Sharpe ratio is given by 
+
+$$ S = \frac{252(\overline{r} - r_f^{\text{daily}})}{\sigma_{\text{ann}}}, $$
+
+i.e. it is the mean daily excess return, multiplied by the number of trading days in a year, divided by the yearly volatility. In main.py, these metrics are also computed for a benchmark strategy, which by default is a long-only position on SPY (an ETF designed to track the S&P 500). Finally, we produce statistics on the trades themselves, including e.g. the trade count, the hit rate (the proportion of trades with positive net returns) and the average holding period. 
+
+
 
 ## An example 
 
