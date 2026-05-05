@@ -1,6 +1,6 @@
 [project]
 name = "pair-trading-research"
-version = "0.1.0"
+version = "0.2.0-dev"
 description = "Cointegration-based pairs trading research pipeline with rolling hedge ratios and transaction-cost-aware backtesting."
 readme = "README.md"
 requires-python = ">=3.11"

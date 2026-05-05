@@ -1,32 +1,57 @@
-# Pairs trading
+# Relative value strategies: a walk-forward and robustness study of stat-arb pairs and macro spread trades
 
-This project is a research pipeline for testing a cointegration-based pairs trading strategy on market price data. More details on the pipeline can be found in the file descriptions below, and we also include a section explaining the required background knowledge to understand the strategy. 
+This project provides a research pipeline for studying relative value trading strategies on market price data. Our main goal is to see how the performance of relative value strategies on different classes of pairs are affected by frictions such as trading costs and various model parameters. In particular, we address the extent to which natural statistical arbitrage ('stat-arb') pairs, thematically related pairs and broader cross-region (or 'macro') remain attractive candidates for relative value strategies after walk-forward estimation, transaction costs, hedge rebalancing costs and benchmark-based evaluation are taken into account. We will see that that near-substitute pairs such as SPY/IVV become unprofitable after only modest costs are included, whilst thematically related pairs such as QQQ/XLK and cross-region pairs such as IEFA/EEM can still produce stable (although modest) out-of-sample performance.
+
+The remainder of the README is organized as follows:
+
+1. [Module summaries](#module-summaries): a brief description of each module in the repository
+2. [Assumptions](#assumptions): a list of simplifying assumptions used in strategy construction and evaluation
+3. [Background and methodology](#background-and-methodology): explanations of the main ideas behind spread construction, backtesting and evaluation
+4. [Examples](#examples): a run-through of the pipeline on selected pairs, including sensitivity to transaction costs, risk-free rates, and other modelling choices
 
 
-## File summaries
 
-`data.py` Loads and cleans adjusted price data for a user-specified selection of assets (provided as a list of ticker symbols) using the yfinance module (an open source tool that uses Yahoo Finance's publicly available APIs). Given the list of assets, we run the Engle–Granger cointegration test on all possible pairs and retain those pairs for which the null hypothesis of no cointegration can be rejected with a user-specified p-value. We also produce plots relating to these pairs to further help identify economically plausible pairs.
+## Module summaries
 
-`signal_construction.py` For a given pair of assets we estimate their hedge ratio over a given date range by regressing one price series on the other. We use this to construct a dynamic hedge ratio and corresponding residual spread which is updated daily and based on price data from some fixed window of time (typically a few years). This spread is then standardised to produce an adapative rolling z-score, which is used to generate trading signals as follows: when there are large deviations above the equilibrium we go short on the spread, when there are large deviations below the equilibrium we go long on the spread, and when the prices returns to near the equilibrium we close our position.
+`data.py` Loads and cleans adjusted price data for a user-specified universe of assets using yfinance (an open source tool that uses Yahoo Finance's publicly available APIs), generates all possible pairs from that universe and provides an initial screening step to identify potential stab-arb candidate pairs using the Engle–Granger cointegration test.
 
-`backtesting.py` We backtest the above trading strategy using out-of-sample historical data, incorporating both entry/exit costs from entering/exiting positions *and* rebalancing costs arising from the evolving hedge ratio when computing net returns.
+`signal_construction.py` Constructs the tradeable spread for a chosen pair in terms of a dynamic hedge ratio, which is estimated on a walk-forward basis using rolling regression. The resulting residual spread is standardised into an adaptive rolling z-score, which is then used to generate long, short and flat signals. For natural stat-arb pairs, this spread can be interpreted as a mean-reverting residual; for cross-region pairs, it is better interpreted as a dynamically hedged relative value signal.
 
-`evaluation.py` A more detailed analysis on the performance of our strategy is carried out. We compute various metrics on performance such as total returns, annualised returns, annualised volatility, annualised Sharpe ratio and maximum drawdown, we provide data pertaining to individual trades (e.g. returns and holding period), and we also provide further statistics such as trade count, hit rates, payoff ratios etc. 
+`backtesting.py` Implements an out-of-sample backtest for the spread strategy described above using close-to-close returns. The module computes daily gross and net returns, incorporates entry/exit costs and hedge rebalancing costs, and tracks cumulative performance and drawdowns. 
 
-`main.py` Compiles the above into a clean pipeline, with the option to bypass pair selection from data.py if the user already has a pair of assets they wish to use. Various parameters are set within this file, including dates, windows for computing OLS coefficients and z-scores, entry/exit thresholds, trading costs and the risk-free rate used in computing the Sharpe ratio. 
+`evaluation.py` Computes performance metrics for both the strategy and a chosen benchmark, including total return, annualised return, annualised volatility, annualised Sharpe ratio and maximum drawdown. We also extract trade-level information such as trade count, holding periods, hit rates and payoff characteristics. (In the broader context of this project, this module is used not just to rank candidate pairs, but also to see how the performance of relative value strategies on different classes of pairs are affected by realistic frictions and various model parameters.)
+
+`main.py` Initiates the pipeline, either in full or in part as specified by the user. It allows the user to specify a universe of assets for screening, select a pair of assets on which to run the strategy, choose benchmark and transaction-cost assumptions, and specify other parameters such as various timeframes. It then runs the user-specified parts of the pipeline end-to-end (pair screening, signal construction, backtesting and evaluation). 
 
 
 ## Assumptions
 
-We make some simplifying assumptions in creating and evaluating our strategy, including:
+Although a large part of this project is to explore the effect certain realistic trading frictions on the performance of relative value strategies, our strategy construction and backtesting pipeline still relies on a few simplifying assumptions about the trading environment:
 
-- Trades can only occur at close 
-- There are no capital constraints
-- Perfect shorting (i.e. no constraints or fees on borrowing, and no recalls)
-- No financing costs or margin requirements
-- No bid-ask spread or slippage (i.e. no market impact from making the proposed trades)
-- Perfect liquidity
-- No stop-loss or risk controls (i.e. we can hold our positions until exit thresholds are reached)
+- **Trades occur at close.** Signals are generated using end-of-day price data, and entries, exits and hedge rebalancing are assumed to occur at close. This is a simplifying approximation to trading near market close.
+
+- **No capital or leverage constraints.** The strategy is not prevented from taking the desired positions because of limited capital, leverage caps or broker-imposed exposure limits.
+
+- **No financing or margin requirements.** We assume that no financing costs are incurred on investment capital, and that there are no broker-imposed margin requirements. As a result, returns are computed simply by normalising by prior-day gross exposure.
+
+- **Shorting is frictionless.** We assume that short positions can always be established and maintained, with no borrowing fees, recalls or other restrictions. (This is related to the previous assumption regarding no margin requirements.)
+
+- **Simplified model of transaction costs.** Entry, exit and hedge rebalancing costs are represented as fixed basis-point costs per unit traded. Bid-ask spreads, slippage and market impact are not considered. 
+
+- **Sufficient liquidity.** We assume that all trades can be executed at observed close prices in the desired quantities, with no volume constraints or partial fills.
+
+- **No stop-loss or external risk controls.** Positions are closed according to the signal rules alone, rather than through discretionary or risk-management interventions.
+
+The assumptions above largely concern the trading environment. We also point out the following modelling choices: 
+
+- **Cointegration is a helpful diagnostic, not a universal requirement.** The Engle–Granger test is useful for identifying plausible stat-arb candidates, but thematically-related pairs and cross-region pairs may still be economically interesting even when they do not satisfy a strict cointegration criterion.
+
+- **The rolling hedge ratio is a modelling device, not necessarily a structural equilibrium.** For natural stat-arb pairs, the hedge ratio is crucial to identifying large deviations from the mean,  which we interpret as a structural equilibrium. For other pairs, the hedge ratio is used simply to maintain dynamic hedging.
+
+- **A simple benchmark.** By default, benchmark comparisons are made against a long-only position on SPY, which is informative but not directly equivalent to a market-neutral capital allocation one typically looks for in relative-value strategies.
+
+- **Parameter sensitivity.** As we will study in more detail below, performance may be sensitive to formation windows, z-score windows and entry/exit thresholds.
+
 
 
 ## Background and methodology 
@@ -104,7 +129,7 @@ i.e. it is the mean daily excess return, multiplied by the number of trading day
 
 
 
-## An example 
+## Examples
 
 In what follows, we run through the pipeline with the following parameters (note that we set the p-value threshold equal to 1 for illustrative purposes):
 
@@ -214,6 +239,3 @@ As a sensitivity check, we can remove transaction costs and set the risk-free ra
 | Annualised Sharpe ratio  | 0.9217   | 0.8663    |
 | Maximum drawdown       | 0.0312   | 0.3372    |
 
-
-
-## To do
