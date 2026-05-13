@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt 
 from itertools import combinations
 from statsmodels.tsa.stattools import coint 
+from pathlib import Path
 
 
 def load_prices(tickers: list[str], start_date: pd.Timestamp, end_date: pd.Timestamp) -> pd.DataFrame:  # can also enter date as string of the form 'yyyy-mm-dd'
@@ -34,9 +35,6 @@ def test_coint(series1: pd.Series, series2: pd.Series) -> float:
     """Uses the Engle-Granger method to test for cointegration between series1 and series2, with a low p-value suggesting cointegration"""
     _, pvalue, _ = coint(series1, series2, trend = 'c')     #change trend to 'ct' to allow constant + linear trend 
     return pvalue 
-
-
-
 
 
 def find_coint_pairs(tickers: list[str], start_date: pd.Timestamp, end_date: pd.Timestamp, pvalue_threshold: float) -> tuple[pd.DataFrame, pd.DataFrame, list[list]]:
@@ -72,7 +70,11 @@ def find_coint_pairs(tickers: list[str], start_date: pd.Timestamp, end_date: pd.
 
 # --------------- Visual inspection ----------------
 
-def plot_raw_prices(prices: pd.DataFrame) -> None:
+script_dir = Path(__file__).resolve().parent
+images_dir = script_dir/"images"
+
+
+def plot_raw_prices(prices: pd.DataFrame, save_plots = False) -> None:
     fig, ax = plt.subplots(figsize = (12, 6))
     prices.plot(ax = ax)
     plt.title(f'Adjusted Close Prices for {prices.columns[0]} and {prices.columns[1]}')
@@ -80,11 +82,15 @@ def plot_raw_prices(prices: pd.DataFrame) -> None:
     plt.ylabel('Price')
     plt.legend(loc = 'best')
     plt.tight_layout()
-    filename = f'{prices.columns[0]}{prices.columns[1]}1.png'
-    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
+
+    if save_plots == True:
+        filename = f'{prices.columns[0]}{prices.columns[1]}1.png'
+        plt.savefig(images_dir/filename, dpi = 300, bbox_inches = 'tight')
+    
+    plt.show()
 
 
-def plot_normalised_prices(prices: pd.DataFrame) -> None:
+def plot_normalised_prices(prices: pd.DataFrame, save_plots = False) -> None:
     normalised = prices/prices.iloc[0]
     fig, ax = plt.subplots(figsize = (12,6))
     normalised.plot(ax = ax)
@@ -93,11 +99,15 @@ def plot_normalised_prices(prices: pd.DataFrame) -> None:
     plt.ylabel('Normalised Price')
     plt.legend(loc = 'best')
     plt.tight_layout()
-    filename = f'{prices.columns[0]}{prices.columns[1]}2.png'
-    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
-    
 
-def plot_normalised_price_ratios(prices: pd.DataFrame) -> None:
+    if save_plots == True:
+        filename = f'{prices.columns[0]}{prices.columns[1]}2.png'
+        plt.savefig(images_dir/filename, dpi = 300, bbox_inches = 'tight')
+            
+    plt.show()
+
+
+def plot_normalised_price_ratios(prices: pd.DataFrame, save_plots = False) -> None:
     normalised = prices/prices.iloc[0]
     ratio = normalised.iloc[:, 0]/normalised.iloc[:, 1]
     fig, ax = plt.subplots(figsize = (12, 6))
@@ -107,11 +117,15 @@ def plot_normalised_price_ratios(prices: pd.DataFrame) -> None:
     plt.ylabel('Ratio')
     plt.legend(loc = 'best')
     plt.tight_layout()
-    filename = f'{prices.columns[0]}{prices.columns[1]}3.png'
-    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
-    
 
-def plot_normalised_price_scatter(prices: pd.DataFrame) -> None:
+    if save_plots == True:
+        filename = f'{prices.columns[0]}{prices.columns[1]}3.png'
+        plt.savefig(images_dir/filename, dpi = 300, bbox_inches = 'tight')
+    
+    plt.show()
+
+
+def plot_normalised_price_scatter(prices: pd.DataFrame, save_plots = False) -> None:
     normalised = prices/prices.iloc[0]
     plt.figure(figsize = (6,6))
     plt.scatter(normalised.iloc[:, 0], normalised.iloc[:, 1], alpha = 0.5, marker = '.')
@@ -119,14 +133,17 @@ def plot_normalised_price_scatter(prices: pd.DataFrame) -> None:
     plt.ylabel(prices.columns[1])
     plt.title(f'{prices.columns[1]} vs {prices.columns[0]} Normalised Price Scatter')
     plt.tight_layout()
-    filename = f'{prices.columns[0]}{prices.columns[1]}4.png'
-    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
+
+    if save_plots == True:
+        filename = f'{prices.columns[0]}{prices.columns[1]}1.png'
+        plt.savefig(images_dir/filename, dpi = 300, bbox_inches = 'tight')
+    
+    plt.show()
 
 
-def run_plots1(pairs: list[list[str]], start_date: pd.Timestamp, end_date: pd.Timestamp) -> None:
+def run_plots1(pairs: list[list[str]], start_date: pd.Timestamp, end_date: pd.Timestamp, save_plots = False) -> None:
     for pair in pairs: 
         prices = load_prices(pair, start_date, end_date)
-        plot_raw_prices(prices)
-        plot_normalised_prices(prices)
-        plot_normalised_price_scatter(prices)
-        plt.show()
+        plot_raw_prices(prices, save_plots)
+        plot_normalised_prices(prices, save_plots)
+        plot_normalised_price_scatter(prices, save_plots)

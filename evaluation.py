@@ -118,11 +118,11 @@ def extract_trades(backtest_df: pd.DataFrame, cost_bps: float) -> pd.DataFrame:
 def closed_trade_stats(trades_df: pd.Series) -> None:
     if trades_df.empty: 
         return pd.Series({
-            "trade_count": 0,
-            "avg_holding_period_days": np.nan,
-            "hit_rate": np.nan,
-            "avg_win": np.nan,
-            "avg_loss": np.nan
+            "Trade count": 0,
+            "Avg holding period (days)": np.nan,
+            "Hit rate": np.nan,
+            "Avg win": np.nan,
+            "Avg loss": np.nan
         })
     
     closed_trades = trades_df[~trades_df['is_open']]
@@ -134,17 +134,17 @@ def closed_trade_stats(trades_df: pd.Series) -> None:
     avg_loss = losses.mean() if len(losses)>0 else np.nan
 
     stats = pd.Series({
-        'trade_count': len(closed_trades),
-        'hit_rate': (trade_return > 0).mean(),
-        'avg_trade_return': trade_return.mean(),
-        'median_trade_return': trade_return.median(),
-        'best_trade_return': trade_return.max(),
-        'worst_trade_return': trade_return.min(),
-        'avg_win': avg_win,
-        'avg_loss': avg_loss, 
-        'payoff_ratio': avg_win / abs(avg_loss) if pd.notna(avg_win) and pd.notna(avg_loss) and avg_loss != 0 else np.nan,
-        'avg_holding_period_days': closed_trades['duration_days'].mean(),
-        'median_holding_period_days': closed_trades['duration_days'].median(),
+        'Trade count': len(closed_trades),
+        'Hit rate': (trade_return > 0).mean(),
+        'Avg trade return': trade_return.mean(),
+        'Median trade return': trade_return.median(),
+        'Best trade return': trade_return.max(),
+        'Worst trade return': trade_return.min(),
+        'Avg win': avg_win,
+        'Avg loss': avg_loss, 
+        'Payoff ratio': avg_win / abs(avg_loss) if pd.notna(avg_win) and pd.notna(avg_loss) and avg_loss != 0 else np.nan,
+        'Avg holding period (days)': closed_trades['duration_days'].mean(),
+        'Median holding period (days)': closed_trades['duration_days'].median(),
     })
 
     return stats 

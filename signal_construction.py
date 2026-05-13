@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt 
 import statsmodels.api as sm 
 import data
+from pathlib import Path
 
 
 def estimate_hedge_ratio(prices: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timestamp) -> tuple[float,float]:
@@ -53,14 +54,12 @@ def compute_zscore(spread: float, zscore_window: int) -> tuple[pd.Series, pd.Ser
 
 
 def generate_positions(zscore: pd.Series, start_date: pd.Timestamp, entry_threshold: float, exit_threshold: float) -> tuple[pd.Series, pd.Series]:
-    """
-    Holding position convention: +1 = holding long spread, -1 = holding short spread, 0 = flat
+    """Holding position convention: +1 = holding long spread, -1 = holding short spread, 0 = flat
 
     Rules:  if flat and zscore < -entry_threshold on day t: make trade on day t and enter long spread (reflected in holding position from day t+1)
             if flat and zscore >  entry_threshold on day t: make trade on day t and enter short spread (reflected in holding position from day t+1)
             if long spread and zscore > -exit_threshold on day t: make trade on day t and exit long spread (reflected in holding position from day t+1)
-            if short spread and zscore < exit_threshold on day t: make trade on day t and exit short spread (reflected in holding position from day t+1)
-    """
+            if short spread and zscore < exit_threshold on day t: make trade on day t and exit short spread (reflected in holding position from day t+1)"""
 
     holding_position = pd.Series(0, index = zscore.index, dtype = int)
     trade_made = pd.Series(0, index = zscore.index, dtype = int)
@@ -133,20 +132,26 @@ def build_signal_dataframe(prices: pd.DataFrame, spread_start: pd.Timestamp, tra
 
 # ---------------- Visual inspection ------------------
 
+script_dir = Path(__file__).resolve().parent
+images_dir = script_dir/"images"
 
-def plot_spread(signal_df: pd.DataFrame) -> None:
+
+def plot_spread(signal_df: pd.DataFrame, save_plots = False) -> None:
     signal_df['spread'].plot(figsize = (12,5))
     plt.title(f'Spread after regressing {signal_df.columns[0]} on {signal_df.columns[1]}')
     plt.xlabel('Date')
     plt.ylabel('Spread')
     plt.legend(loc = 'best')
     plt.tight_layout()
-    filename = f'{signal_df.columns[0]}{signal_df.columns[1]}spread.png'
-    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
+
+    if save_plots == True:
+        filename = f'{signal_df.columns[0]}{signal_df.columns[1]}spread.png'
+        plt.savefig(images_dir/filename, dpi = 300, bbox_inches = 'tight')
+
     plt.show()
 
 
-def plot_zscore(signal_df: pd.DataFrame, entry_threshold: float, exit_threshold: float) -> None:
+def plot_zscore(signal_df: pd.DataFrame, entry_threshold: float, exit_threshold: float, save_plots = False) -> None:
     signal_df['zscore'].plot(figsize = (12,5), label = 'z-score')
     plt.axhline(entry_threshold, linestyle = '--', color = 'red', label = 'Entry thresholds')
     plt.axhline(-entry_threshold, linestyle = '--', color = 'red')
@@ -158,23 +163,29 @@ def plot_zscore(signal_df: pd.DataFrame, entry_threshold: float, exit_threshold:
     plt.ylabel('Z-score')
     plt.tight_layout()
     plt.legend(loc = 'best')
-    filename = f'{signal_df.columns[0]}{signal_df.columns[1]}zscore.png'
-    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
+
+    if save_plots == True:
+        filename = f'{signal_df.columns[0]}{signal_df.columns[1]}zscore.png'
+        plt.savefig(images_dir/filename, dpi = 300, bbox_inches = 'tight')
+
     plt.show()
 
 
-def plot_position(signal_df: pd.DataFrame) -> None:
+def plot_position(signal_df: pd.DataFrame, save_plots = False) -> None:
     signal_df['holding_position'].plot(figsize=(12, 3))
     plt.title(f'Holding position for {signal_df.columns[0]}/{signal_df.columns[1]} spread')
     plt.xlabel('Date')
     plt.ylabel('Position')
     plt.tight_layout()
-    filename = f'{signal_df.columns[0]}{signal_df.columns[1]}position.png'
-    plt.savefig(f"/Users/jonahduncan/Desktop/python_work/quant_projects/pair_trading/images/{filename}", dpi = 300, bbox_inches = 'tight')
+
+    if save_plots == True:
+        filename = f'{signal_df.columns[0]}{signal_df.columns[1]}position.png'
+        plt.savefig(images_dir/filename, dpi = 300, bbox_inches = 'tight')
+
     plt.show()
 
 
-def run_plots2(df: pd.DataFrame, entry_threshold: float, exit_threshold: float) -> None:
-    plot_spread(df)
-    plot_zscore(df, entry_threshold, exit_threshold)
-    plot_position(df)
+def run_plots2(df: pd.DataFrame, entry_threshold: float, exit_threshold: float, save_plots = False) -> None:
+    plot_spread(df, save_plots)
+    plot_zscore(df, entry_threshold, exit_threshold, save_plots)
+    plot_position(df, save_plots)
