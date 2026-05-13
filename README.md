@@ -437,13 +437,13 @@ Individual trade statistics for the strategy are as follows:
 Finally we consider the robustness of the above strategies with respect to trading costs and other parameters, starting with the pair SPY/IVV. The tight relationship between these two assets is likely a large contributing factor to the small average trade return of 0.04%, suggesting that even small transaction costs will sharply decrease the hit rate of 99.61% and wipe out overall returns. This is confirmed by the following plot of total returns and hit rate as a function of the cost in basis points (bps): 
 
 <p align="center">
-  <img src="images/IVVSPYreturnhitvscost.png" width="800" alt="SPY IVV return and hit rate vs costs">
+  <img src="images/SPYIVVreturnhitvscost.png" width="800" alt="SPY IVV return and hit rate vs costs">
 </p>
 
 We also observed that the large Sharpe ratio of 2.56 for the strategy was a result of low volatility rather than high returns. We should therefore expect a positive Sharpe ratio to persist for only small positive transaction costs and risk-free rates, as demonstrated in the following heat map; we draw two contour lines, one where the Sharpe ratio is zero and the other where it is equal to half its value in the case where transaction costs and the risk-free rate are set to zero. 
 
 <p align="center">
-  <img src="images/IVVSPYsharpeheatmap.png" width="800" alt="SPY IVV sharpe heat map">
+  <img src="images/SPYIVVsharpeheatmap.png" width="800" alt="SPY IVV sharpe heat map">
 </p>
 
 Next we consider the pair QQQ/XLK. We see that the strategy for this pair is more robust than for SPY/IVV: both the total returns and the hit rate are less sensitive to initial increases in transaction costs:
